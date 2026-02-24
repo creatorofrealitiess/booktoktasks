@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Booktok">
+<meta name="theme-color" content="#0d0b10">
+<meta name="description" content="Booktok task manager">
+<title>Booktok Tasks</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700&f[]=erode@400,500,600,700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0b10;
+    --surface: #1a1724;
+    --surface2: #221f2e;
+    --border: #2e2840;
+    --accent: #c084fc;
+    --accent-pink: #f0abfc;
+    --text: #ede8f5;
+    --text-muted: #8b7fa8;
+    --text-dim: #6b6080;
+    --text-faint: #4a4060;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  ::-webkit-scrollbar { display: none; }
+  html, body { overscroll-behavior: none; }
+
+  body {
+    font-family: 'Satoshi', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Animations ── */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+  @keyframes toastOut {
+    from { opacity: 1; transform: translateX(-50%) translateY(0); }
+    to { opacity: 0; transform: translateX(-50%) translateY(16px); }
+  }
+  @keyframes modalUp {
+    from { opacity: 0; transform: translateY(40px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes backdropIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* ── App Shell ── */
+  #app {
+    max-width: 480px;
+    margin: 0 auto;
+    position: relative;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  /* ── Loading ── */
+  .loading-screen {
+    position: fixed; inset: 0;
+    background: var(--bg);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 16px; z-index: 999;
+    transition: opacity 0.4s;
+  }
+  .loading-screen.hide { opacity: 0; pointer-events: none; }
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  .loading-text {
+    font-family: 'Erode', serif;
+    color: var(--text-dim);
+    font-size: 15px;
+    font-style: italic;
+  }
+
+  /* ── Header ── */
+  .header {
+    padding: 56px 20px 14px;
+    padding-top: max(56px, calc(env(safe-area-inset-top, 0px) + 16px));
+    background: linear-gradient(180deg, #160f28 0%, var(--bg) 100%);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header-row {
+    display: flex; align-items: center;
+    justify-content: space-between; margin-bottom: 16px;
+  }
+  .header h1 {
+    font-family: 'Erode', serif;
+    font-size: 24px; font-weight: 600;
+    color: var(--accent-pink);
+    letter-spacing: -0.5px;
+  }
+  .header-actions {
+    display: flex; gap: 8px;
+  }
+  .header-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: 'Satoshi', sans-serif;
+    font-size: 12px; font-weight: 500;
+    padding: 6px 14px; border-radius: 20px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .header-btn:active { transform: scale(0.95); }
+
+  /* ── Tabs ── */
+  .tabs-wrap {
+    display: flex; gap: 6px;
+    overflow-x: auto; scrollbar-width: none;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .tab {
+    flex-shrink: 0; height: 44px; padding: 0 14px;
+    border-radius: 12px; border: 1.5px solid var(--border);
+    background: #141220; color: var(--text-dim);
+    font-family: 'Satoshi', sans-serif;
+    font-size: 13px; font-weight: 500;
+    cursor: pointer; display: flex;
+    align-items: center; gap: 6px;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+  }
+  .tab.active {
+    background: color-mix(in srgb, var(--tab-color) 10%, transparent);
+    border-color: var(--tab-color);
+    color: var(--tab-color);
+  }
+  .tab-emoji { font-size: 12px; }
+  .tab-count {
+    font-size: 11px; font-weight: 600;
+    background: var(--surface);
+    color: var(--text-dim);
+    padding: 1px 7px; border-radius: 8px;
+    min-width: 20px; text-align: center;
+  }
+  .tab.active .tab-count {
+    background: var(--tab-color);
+    color: var(--bg);
+  }
+
+  /* ── Content ── */
+  .content { padding: 12px 16px 140px; }
+
+  /* ── Section Headers ── */
+  .section-head {
+    display: flex; align-items: center;
+    justify-content: space-between;
+    margin: 12px 0 10px;
+  }
+  .section-label {
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .section-label.done { color: var(--text-faint); }
+
+  /* ── Task Card ── */
+  .task-outer {
+    position: relative; overflow: hidden;
+    border-radius: 16px; margin-bottom: 8px;
+  }
+  .task-delete-bg {
+    position: absolute; right: 0; top: 0; bottom: 0;
+    width: 80px; background: #dc2626;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 0 16px 16px 0;
+  }
+  .task-delete-btn {
+    background: none; border: none;
+    color: #fff; font-size: 13px;
+    font-family: 'Satoshi', sans-serif;
+    font-weight: 600; cursor: pointer;
+    padding: 8px 16px;
+  }
+  .task-card {
+    position: relative; z-index: 1;
+    background: var(--surface);
+    border-left: 3.5px solid var(--task-color, var(--accent));
+    padding: 16px 14px 16px 16px;
+    display: flex; align-items: flex-start; gap: 12px;
+    transition: transform 0.25s ease, opacity 0.3s;
+    border-radius: 16px;
+  }
+  .task-card.swiped { transform: translateX(-80px); }
+  .task-card.is-done {
+    background: #13111a;
+    border-left-color: color-mix(in srgb, var(--task-color) 30%, transparent);
+    opacity: 0.55;
+  }
+
+  /* Checkbox */
+  .check {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 2.5px solid var(--task-color, var(--accent));
+    flex-shrink: 0; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 1px; transition: all 0.25s ease;
+    background: transparent; padding: 0;
+  }
+  .check.checked {
+    background: var(--task-color, var(--accent));
+  }
+  .check svg { display: none; }
+  .check.checked svg { display: block; }
+
+  .task-body { flex: 1; min-width: 0; }
+  .task-title {
+    font-size: 16px; font-weight: 500;
+    line-height: 1.45; color: var(--text);
+    word-break: break-word;
+  }
+  .task-card.is-done .task-title {
+    text-decoration: line-through;
+    text-decoration-color: #6b608088;
+    color: var(--text-dim);
+  }
+  .task-meta {
+    display: flex; align-items: center;
+    gap: 8px; margin-top: 4px; flex-wrap: wrap;
+  }
+  .task-due {
+    font-size: 12px; color: var(--text-muted);
+  }
+  .task-due.overdue { color: #f87171; font-weight: 600; }
+  .task-due.today { color: #34d399; font-weight: 600; }
+  .task-due.is-done { color: var(--text-faint); font-weight: 400; }
+  .task-list-badge {
+    font-size: 11px; padding: 1px 8px;
+    border-radius: 8px; font-weight: 500;
+  }
+  .task-notes {
+    font-size: 13px; color: var(--text-dim);
+    margin-top: 4px; line-height: 1.4;
+  }
+
+  /* ── Empty State ── */
+  .empty {
+    text-align: center; padding: 56px 20px;
+    color: var(--text-faint);
+    animation: fadeUp 0.4s ease;
+  }
+  .empty-icon { font-size: 40px; margin-bottom: 10px; }
+  .empty-text { font-size: 14px; }
+
+  /* ── Add Task Bar ── */
+  .add-wrap {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(0deg, var(--bg) 75%, transparent 100%);
+    padding: 12px 16px calc(16px + var(--safe-bottom));
+    z-index: 200;
+    max-width: 480px; margin: 0 auto;
+  }
+  .add-form {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 16px;
+    display: flex; align-items: center;
+    gap: 8px; padding: 10px 12px;
+    transition: border-color 0.2s;
+  }
+  .add-form:focus-within { border-color: var(--accent); }
+  .add-input {
+    flex: 1; background: none; border: none; outline: none;
+    font-size: 15px; color: var(--text);
+    font-family: 'Satoshi', sans-serif;
+    min-width: 0;
+  }
+  .add-input::placeholder { color: var(--text-muted); }
+  .add-date {
+    background: none; border: none; outline: none;
+    font-size: 12px; color: var(--text-dim);
+    font-family: 'Satoshi', sans-serif;
+    width: 105px; color-scheme: dark;
+  }
+  .add-submit {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: none; background: var(--accent);
+    color: var(--bg); font-size: 22px;
+    font-weight: 300; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; line-height: 1;
+    transition: transform 0.15s;
+  }
+  .add-submit:active { transform: scale(0.9); }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed; bottom: 110px; left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text); font-size: 13px; font-weight: 500;
+    padding: 10px 20px; border-radius: 20px;
+    z-index: 300; white-space: nowrap;
+    animation: toastIn 0.3s ease;
+    pointer-events: none;
+  }
+
+  /* ── Modal ── */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 1000;
+    display: flex; align-items: flex-end; justify-content: center;
+    padding: 16px;
+    animation: backdropIn 0.2s ease;
+  }
+  .modal {
+    background: var(--surface);
+    border-radius: 24px; padding: 24px;
+    width: 100%; max-width: 480px;
+    max-height: 70vh;
+    display: flex; flex-direction: column; gap: 16px;
+    border: 1px solid var(--border);
+    animation: modalUp 0.3s ease;
+  }
+  .modal h2 {
+    font-family: 'Erode', serif;
+    font-size: 20px; font-weight: 600;
+    color: var(--text);
+  }
+  .modal p {
+    font-size: 13px; color: var(--text-muted);
+    line-height: 1.5;
+  }
+  .modal textarea {
+    width: 100%; min-height: 140px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px;
+    color: var(--text); font-size: 13px;
+    font-family: monospace; resize: vertical;
+    outline: none;
+  }
+  .modal textarea:focus { border-color: var(--accent); }
+  .modal-buttons { display: flex; gap: 10px; }
+  .modal-btn {
+    flex: 1; padding: 12px 16px;
+    border-radius: 12px;
+    font-family: 'Satoshi', sans-serif;
+    font-size: 14px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .modal-btn:active { transform: scale(0.97); }
+  .modal-btn.secondary {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-muted); font-weight: 500;
+  }
+  .modal-btn.primary {
+    background: var(--accent);
+    border: none;
+    color: var(--bg); font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="loading-screen" id="loadingScreen">
+    <div class="spinner"></div>
+    <div class="loading-text">loading your lists...</div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// BOOKTOK TASKS — Standalone PWA
+// ══════════════════════════════════════════════════════════════
+
+const LISTS = [
+  { key: "batch_RE", label: "Batch (RE)", color: "#f97316", emoji: "🔥" },
+  { key: "batch_DK", label: "Batch (DK)", color: "#60a5fa", emoji: "💎" },
+  { key: "batch_PV", label: "Batch (PV)", color: "#34d399", emoji: "🌿" },
+  { key: "sent_RE",  label: "Sent (RE)",  color: "#fbbf24", emoji: "✉️" },
+  { key: "sent_DK",  label: "Sent (DK)",  color: "#fbbf24", emoji: "✉️" },
+  { key: "sent_PV",  label: "Sent (PV)",  color: "#fbbf24", emoji: "✉️" },
+  { key: "post",     label: "Posting",    color: "#c084fc", emoji: "📱" },
+];
+const ALL_DONE = { key: "__completed__", label: "All Done", color: "#a3e635", emoji: "✅" };
+const ALL_TABS = [...LISTS, ALL_DONE];
+
+// ── State ──
+let state = { tasks: {} };
+let activeTab = LISTS[0].key;
+let toastTimer = null;
+let idCounter = 0;
+
+function uid() { return "t_" + Date.now() + "_" + (++idCounter); }
+
+// ── Storage (localStorage for true offline) ──
+function loadState() {
+  try {
+    const raw = localStorage.getItem("booktok-tasks-v2");
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return null;
+}
+function saveState() {
+  try { localStorage.setItem("booktok-tasks-v2", JSON.stringify(state)); }
+  catch(e) { console.error("Save failed", e); }
+}
+function getDefaultState() {
+  const tasks = {};
+  LISTS.forEach(l => { tasks[l.key] = []; });
+  return { tasks };
+}
+
+// ── Date Helpers ──
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+function formatDue(ds) {
+  if (!ds) return "";
+  const [y,m,d] = ds.split("-").map(Number);
+  const due = new Date(y, m-1, d);
+  const now = new Date(); now.setHours(0,0,0,0);
+  const diff = Math.round((due - now) / 86400000);
+  if (diff < -1) return Math.abs(diff) + "d overdue";
+  if (diff === -1) return "Yesterday";
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Tomorrow";
+  if (diff < 7) return due.toLocaleDateString("en-US", { weekday: "short" });
+  return due.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+function dueStatus(ds, done) {
+  if (done || !ds) return "";
+  const [y,m,d] = ds.split("-").map(Number);
+  const due = new Date(y, m-1, d);
+  const now = new Date(); now.setHours(0,0,0,0);
+  const diff = Math.round((due - now) / 86400000);
+  if (diff < 0) return "overdue";
+  if (diff === 0) return "today";
+  return "";
+}
+function esc(s) {
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+// ── Toast ──
+function showToast(msg) {
+  let t = document.getElementById("toast");
+  if (t) t.remove();
+  t = document.createElement("div");
+  t.id = "toast";
+  t.className = "toast";
+  t.textContent = msg;
+  document.getElementById("app").appendChild(t);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { if (t) t.remove(); }, 2200);
+}
+
+// ══════════════════════════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════════════════════════
+
+function render() {
+  const app = document.getElementById("app");
+  const isCompletedTab = activeTab === ALL_DONE.key;
+
+  // Counts
+  const activeCounts = {};
+  let totalDone = 0;
+  LISTS.forEach(l => {
+    const tasks = state.tasks[l.key] || [];
+    activeCounts[l.key] = tasks.filter(t => !t.done).length;
+    totalDone += tasks.filter(t => t.done).length;
+  });
+
+  // Build HTML
+  let html = "";
+
+  // Header
+  html += `<div class="header">
+    <div class="header-row">
+      <h1>📚 booktok</h1>
+      <div class="header-actions">
+        <button class="header-btn" onclick="openImportModal()">↓ import</button>
+        <button class="header-btn" onclick="exportData()">↑ export</button>
+      </div>
+    </div>
+    <div class="tabs-wrap" id="tabsWrap">`;
+
+  ALL_TABS.forEach(tab => {
+    const isActive = activeTab === tab.key;
+    const count = tab.key === ALL_DONE.key ? totalDone : (activeCounts[tab.key] || 0);
+    html += `<button class="tab${isActive ? ' active' : ''}" style="--tab-color:${tab.color}" onclick="switchTab('${tab.key}')">
+      <span class="tab-emoji">${tab.emoji}</span>
+      ${tab.label}
+      <span class="tab-count">${count}</span>
+    </button>`;
+  });
+
+  html += `</div></div>`;
+
+  // Content
+  html += `<div class="content">`;
+
+  if (isCompletedTab) {
+    // Aggregate all done tasks
+    let allDone = [];
+    LISTS.forEach(l => {
+      (state.tasks[l.key] || []).forEach(t => {
+        if (t.done) allDone.push({ ...t, _key: l.key, _label: l.label, _color: l.color });
+      });
+    });
+    allDone.sort((a,b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0));
+
+    if (allDone.length === 0) {
+      html += `<div class="empty"><div class="empty-icon">🌱</div><div class="empty-text">No completed tasks yet</div></div>`;
+    } else {
+      allDone.forEach((task, i) => {
+        html += renderTaskCard(task, task._color, task._key, true, task._label, i);
+      });
+    }
+  } else {
+    const tasks = state.tasks[activeTab] || [];
+    const active = tasks.filter(t => !t.done).sort((a,b) => new Date(a.due) - new Date(b.due));
+    const done = tasks.filter(t => t.done).sort((a,b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0));
+    const listColor = LISTS.find(l => l.key === activeTab)?.color || "#c084fc";
+
+    if (active.length === 0 && done.length === 0) {
+      html += `<div class="empty"><div class="empty-icon">✨</div><div class="empty-text">All clear — nice work!</div></div>`;
+    } else {
+      if (active.length > 0) {
+        html += `<div class="section-head"><span class="section-label">To Do · ${active.length}</span></div>`;
+        active.forEach((t, i) => { html += renderTaskCard(t, listColor, activeTab, false, null, i); });
+      }
+      if (done.length > 0) {
+        html += `<div class="section-head" style="margin-top:${active.length > 0 ? 24 : 12}px"><span class="section-label done">Done · ${done.length}</span></div>`;
+        done.forEach((t, i) => { html += renderTaskCard(t, listColor, activeTab, true, null, i); });
+      }
+    }
+  }
+
+  html += `</div>`;
+
+  // Add task bar (hidden on completed tab)
+  if (!isCompletedTab) {
+    html += `<div class="add-wrap">
+      <div class="add-form">
+        <input class="add-input" id="addInput" type="text" placeholder="Add a task…" autocomplete="off">
+        <input class="add-date" id="addDate" type="date" value="${todayStr()}">
+        <button class="add-submit" onclick="addTask()">+</button>
+      </div>
+    </div>`;
+  }
+
+  app.innerHTML = html;
+
+  // Attach enter key
+  const inp = document.getElementById("addInput");
+  if (inp) {
+    inp.addEventListener("keydown", e => { if (e.key === "Enter") addTask(); });
+  }
+
+  // Restore scroll for tabs
+  requestAnimationFrame(() => {
+    const activeTabEl = document.querySelector(".tab.active");
+    if (activeTabEl) activeTabEl.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  });
+}
+
+function renderTaskCard(task, color, listKey, isDone, badgeLabel, idx) {
+  const dueLabel = formatDue(task.due);
+  const dueCls = isDone ? "is-done" : dueStatus(task.due, isDone);
+
+  let meta = "";
+  if (dueLabel) {
+    meta += `<span class="task-due ${dueCls}">${dueLabel}</span>`;
+  }
+  if (badgeLabel) {
+    meta += `<span class="task-list-badge" style="background:${color}22;color:${color}">${badgeLabel}</span>`;
+  }
+
+  return `<div class="task-outer" id="task_${task.id}" ontouchstart="swipeStart(event)" ontouchend="swipeEnd(event,'${task.id}')" style="animation:fadeUp 0.3s ease ${idx * 0.03}s both">
+    <div class="task-delete-bg">
+      <button class="task-delete-btn" onclick="deleteTask('${listKey}','${task.id}')">Delete</button>
+    </div>
+    <div class="task-card${isDone ? ' is-done' : ''}" id="card_${task.id}" style="--task-color:${color}">
+      <button class="check${isDone ? ' checked' : ''}" style="--task-color:${color}" onclick="toggleTask('${listKey}','${task.id}')">
+        <svg width="13" height="10" viewBox="0 0 13 10" fill="none">
+          <path d="M1.5 5L5 8.5L11.5 1.5" stroke="#0d0b10" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <div class="task-body">
+        <div class="task-title">${esc(task.title)}</div>
+        ${meta ? `<div class="task-meta">${meta}</div>` : ""}
+        ${task.notes ? `<div class="task-notes">${esc(task.notes)}</div>` : ""}
+      </div>
+    </div>
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// INTERACTIONS
+// ══════════════════════════════════════════════════════════════
+
+function switchTab(key) {
+  activeTab = key;
+  render();
+}
+
+function toggleTask(listKey, taskId) {
+  const tasks = state.tasks[listKey] || [];
+  const task = tasks.find(t => t.id === taskId);
+  if (task) {
+    task.done = !task.done;
+    task.completedAt = task.done ? new Date().toISOString() : null;
+  }
+  saveState();
+  render();
+}
+
+function deleteTask(listKey, taskId) {
+  state.tasks[listKey] = (state.tasks[listKey] || []).filter(t => t.id !== taskId);
+  saveState();
+  render();
+}
+
+function addTask() {
+  const inp = document.getElementById("addInput");
+  const dateInp = document.getElementById("addDate");
+  const title = inp ? inp.value.trim() : "";
+  if (!title) return;
+
+  const task = {
+    id: uid(),
+    title: title,
+    due: dateInp ? dateInp.value : todayStr(),
+    notes: "",
+    done: false,
+    completedAt: null,
+  };
+
+  if (!state.tasks[activeTab]) state.tasks[activeTab] = [];
+  state.tasks[activeTab].push(task);
+  state.tasks[activeTab].sort((a,b) => {
+    if (a.done !== b.done) return a.done ? 1 : -1;
+    return new Date(a.due) - new Date(b.due);
+  });
+
+  saveState();
+  inp.value = "";
+  render();
+  showToast("Task added ✓");
+
+  // Re-focus input
+  requestAnimationFrame(() => {
+    const newInp = document.getElementById("addInput");
+    if (newInp) newInp.focus();
+  });
+}
+
+// ── Swipe ──
+let swipeStartX = 0;
+let currentSwipedId = null;
+
+function swipeStart(e) {
+  swipeStartX = e.touches[0].clientX;
+}
+function swipeEnd(e, taskId) {
+  const diff = swipeStartX - e.changedTouches[0].clientX;
+  const card = document.getElementById("card_" + taskId);
+  if (!card) return;
+
+  if (diff > 80) {
+    // Swipe left — reveal delete
+    if (currentSwipedId && currentSwipedId !== taskId) {
+      const prev = document.getElementById("card_" + currentSwipedId);
+      if (prev) prev.classList.remove("swiped");
+    }
+    card.classList.add("swiped");
+    currentSwipedId = taskId;
+  } else if (diff < -40 || Math.abs(diff) < 10) {
+    card.classList.remove("swiped");
+    if (currentSwipedId === taskId) currentSwipedId = null;
+  }
+}
+
+// Close swipe on tap elsewhere
+document.addEventListener("touchstart", (e) => {
+  if (currentSwipedId && !e.target.closest("#task_" + currentSwipedId)) {
+    const card = document.getElementById("card_" + currentSwipedId);
+    if (card) card.classList.remove("swiped");
+    currentSwipedId = null;
+  }
+});
+
+// ── Import / Export ──
+function openImportModal() {
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  backdrop.id = "importModal";
+  backdrop.onclick = (e) => { if (e.target === backdrop) backdrop.remove(); };
+  backdrop.innerHTML = `
+    <div class="modal" onclick="event.stopPropagation()">
+      <h2>Import Tasks</h2>
+      <p>Paste the JSON output from your Apps Script export below. This will merge with any existing tasks.</p>
+      <textarea id="importText" placeholder='{"tasks": {"batch_RE": [...], ...}}'></textarea>
+      <div class="modal-buttons">
+        <button class="modal-btn secondary" onclick="document.getElementById('importModal').remove()">Cancel</button>
+        <button class="modal-btn primary" onclick="doImport()">Import</button>
+      </div>
+    </div>
+  `;
+  document.getElementById("app").appendChild(backdrop);
+}
+
+function doImport() {
+  const txt = document.getElementById("importText");
+  if (!txt) return;
+  try {
+    const data = JSON.parse(txt.value);
+    if (!data.tasks) throw new Error("Missing tasks key");
+
+    Object.keys(data.tasks).forEach(key => {
+      const incoming = data.tasks[key] || [];
+      const existing = state.tasks[key] || [];
+      const existingIds = new Set(existing.map(t => t.id));
+      // Normalize incoming tasks
+      const newTasks = incoming.filter(t => !existingIds.has(t.id)).map(t => ({
+        id: t.id || uid(),
+        title: t.title || "",
+        due: t.due || "",
+        notes: t.notes || "",
+        done: !!t.done,
+        completedAt: t.completedAt || null,
+      }));
+      state.tasks[key] = [...existing, ...newTasks].sort((a,b) => new Date(a.due || 0) - new Date(b.due || 0));
+    });
+
+    saveState();
+    document.getElementById("importModal")?.remove();
+    render();
+    showToast("Imported successfully ✓");
+  } catch(e) {
+    showToast("Import failed — check JSON format");
+    console.error(e);
+  }
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "booktok-tasks-backup.json";
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast("Exported ✓");
+}
+
+// ══════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════
+
+window.addEventListener("load", () => {
+  const saved = loadState();
+  state = saved || getDefaultState();
+  render();
+  document.getElementById("loadingScreen")?.classList.add("hide");
+  setTimeout(() => document.getElementById("loadingScreen")?.remove(), 500);
+});
+
+// Register service worker
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").then(() => {
+    console.log("SW registered");
+  }).catch(err => console.log("SW failed:", err));
+}
+</script>
+</body>
+</html>
