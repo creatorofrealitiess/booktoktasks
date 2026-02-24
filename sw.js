@@ -1,4 +1,4 @@
-const CACHE_NAME = "booktok-v1";
+const CACHE_NAME = "booktok-v2";
 const ASSETS = [
   "./",
   "./index.html",
@@ -7,6 +7,10 @@ const ASSETS = [
   "./icons/icon-512.png",
   "./icons/icon-180.png",
   "./icons/icon-32.png",
+  "./icon-192.png",
+  "./icon-512.png",
+  "./icon-180.png",
+  "./icon-32.png",
   "https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700&f[]=erode@400,500,600,700&display=swap",
 ];
 
