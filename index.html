@@ -184,6 +184,11 @@
     width: 80px; background: var(--delete-red);
     display: flex; align-items: center; justify-content: center;
     border-radius: 0 12px 12px 0;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  .task-outer.reveal-delete .task-delete-bg {
+    opacity: 1;
   }
   .task-delete-btn {
     background: none; border: none;
@@ -485,7 +490,7 @@ function render() {
   // ── Header ──
   html += '<div class="header">';
   html += '<div class="header-row">';
-  html += '<h1>booktok</h1>';
+  html += '<h1>📚 booktok</h1>';
   html += '<div class="header-actions">';
   html += '<button class="header-btn" onclick="openImportModal()">import</button>';
   html += '<button class="header-btn" onclick="exportData()">export</button>';
@@ -600,8 +605,14 @@ function renderTaskCard(task, color, listKey, badgeLabel) {
 // ══════════════════════════════════════════════════════════════
 
 function switchTab(key) {
+  // Save current tab scroll position before re-render
+  var tabsWrap = document.querySelector('.tabs-wrap');
+  var savedScroll = tabsWrap ? tabsWrap.scrollLeft : 0;
   activeTab = key;
   render();
+  // Restore tab scroll position
+  var newTabsWrap = document.querySelector('.tabs-wrap');
+  if (newTabsWrap) newTabsWrap.scrollLeft = savedScroll;
 }
 
 function toggleTask(listKey, taskId) {
@@ -683,6 +694,9 @@ function swipeMove(e, taskId) {
   var offset = Math.min(0, Math.max(-80, dx));
   card.style.transition = "none";
   card.style.transform = "translateX(" + offset + "px)";
+  var outer = document.getElementById("task_" + taskId);
+  if (outer && offset < -10) outer.classList.add("reveal-delete");
+  else if (outer) outer.classList.remove("reveal-delete");
 }
 
 function swipeEnd(e, taskId) {
@@ -696,17 +710,23 @@ function swipeEnd(e, taskId) {
     // Close any previously swiped card
     if (currentSwipedId && currentSwipedId !== taskId) {
       var prev = document.getElementById("card_" + currentSwipedId);
+      var prevOuter = document.getElementById("task_" + currentSwipedId);
       if (prev) {
         prev.style.transform = "translateX(0)";
         prev.classList.remove("swiped");
       }
+      if (prevOuter) prevOuter.classList.remove("reveal-delete");
     }
     card.style.transform = "translateX(-80px)";
     card.classList.add("swiped");
+    var outer = document.getElementById("task_" + taskId);
+    if (outer) outer.classList.add("reveal-delete");
     currentSwipedId = taskId;
   } else {
     card.style.transform = "translateX(0)";
     card.classList.remove("swiped");
+    var outer2 = document.getElementById("task_" + taskId);
+    if (outer2) outer2.classList.remove("reveal-delete");
     if (currentSwipedId === taskId) currentSwipedId = null;
   }
 
@@ -717,11 +737,13 @@ function swipeEnd(e, taskId) {
 document.addEventListener("touchstart", function(e) {
   if (currentSwipedId && !e.target.closest("#task_" + currentSwipedId)) {
     var card = document.getElementById("card_" + currentSwipedId);
+    var outer = document.getElementById("task_" + currentSwipedId);
     if (card) {
       card.style.transition = "transform 0.2s ease";
       card.style.transform = "translateX(0)";
       card.classList.remove("swiped");
     }
+    if (outer) outer.classList.remove("reveal-delete");
     currentSwipedId = null;
   }
 });
